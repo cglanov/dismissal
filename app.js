@@ -5,10 +5,9 @@
 
 const CONFIG = {
   // Replace with your deployed Google Apps Script Web App URL:
-  API_URL: 'https://script.google.com/macros/s/AKfycbwuhV1WDETx0R8-MMFaBiXjEkdDCq_jsGH49ALedQuhP6ALcibfC4i9-g6hCMHdCcWu/exec',
+  API_URL: 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL',
   STAFF_PIN: '2013',
   POLL_INTERVAL_MS: 3500, // 3.5s polling (<50 concurrent clients hit GAS 3s cache)
-  UNDO_DURATION_MS: 5000, // 5-second UNDO toast banner
   DEFAULT_ALERT_THRESHOLD_SECONDS: 600, // 10 minutes
   INITIAL_BUS_SLOTS: 12,
   STORAGE_AUTH_KEY: 'sdms_auth_expires_at',
@@ -32,8 +31,6 @@ const STATE = {
   searchQueryWaiting: '',
   searchQueryCheckout: '',
   activeModalStudentRow: null,
-  undoPayload: null,
-  undoTimerId: null,
   retryQueue: [],
   inFlightMutations: 0,
   isDemoMode: false
@@ -50,7 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
   bindNameEntryEvents();
   bindCheckoutEvents();
   bindModalEvents();
-  bindUndoEvents();
 
   if (checkSavedAuthSession()) {
     unlockApp();
@@ -211,6 +207,9 @@ function setLayoutMode(mode, persistOverride) {
   }
   const btn = document.getElementById('btn-layout-toggle');
   btn.textContent = mode === 'desktop' ? 'Desktop Mode ⇄' : 'Mobile Mode ⇄';
+  if (STATE.currentScreen === 'buses') {
+    renderBusesScreen();
+  }
 }
 
 /* ==========================================================================
@@ -431,6 +430,7 @@ function commitBusSlots() {
 
 function renderBusesScreen() {
   const slotsContainer = document.getElementById('bus-slots-container');
+  slotsContainer.style.setProperty('--slot-count', Math.max(1, STATE.busInputSlots.length));
   slotsContainer.innerHTML = '';
 
   STATE.busInputSlots.forEach((val, idx) => {
@@ -478,6 +478,8 @@ function renderBusesScreen() {
 
   // Render Recent Buses/Transportation Checklist (Column B)
   const mruContainer = document.getElementById('bus-mru-list');
+  const mruRowCount = Math.max(1, Math.ceil(STATE.mruBuses.length / 2));
+  mruContainer.style.setProperty('--mru-rows', mruRowCount);
   mruContainer.innerHTML = '';
 
   if (STATE.mruBuses.length === 0) {
@@ -491,6 +493,7 @@ function renderBusesScreen() {
     const isChecked = activeSet.has(busStr);
     const label = document.createElement('label');
     label.className = `mru-item ${isChecked ? 'checked' : ''}`;
+    label.title = busStr;
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
@@ -685,21 +688,15 @@ function bindCheckoutEvents() {
     renderCheckoutScreen();
   });
 
-  // 'Mark as Gone' Batch Action — Immediate write with NO confirmation prompt + 5s UNDO
+  // 'Mark as Gone' Batch Action — Immediate write with NO confirmation prompt
   document.getElementById('btn-mark-gone').addEventListener('click', () => {
     if (STATE.selectedCheckoutIds.size === 0) return;
 
     const nowIso = getLocalIsoTimestamp();
-    const undoRecords = [];
     const updates = [];
 
     STATE.students.forEach((st) => {
       if (STATE.selectedCheckoutIds.has(st.rowIndex)) {
-        undoRecords.push({
-          rowIndex: st.rowIndex,
-          priorStatus: st.status,
-          priorTime: st.time
-        });
         st.status = 'Left the Building';
         st.time = nowIso;
         updates.push({ rowIndex: st.rowIndex, status: 'Left the Building', time: nowIso });
@@ -709,7 +706,6 @@ function bindCheckoutEvents() {
     STATE.selectedCheckoutIds.clear();
     renderAll();
     sendMutation({ action: 'updateStudents', updates });
-    showUndoBanner(undoRecords);
   });
 
   // Restore Selected Students from 'Left the Building' Recall View
@@ -745,7 +741,7 @@ function renderCheckoutScreen() {
   const leftList = STATE.students.filter((s) => s.status === 'Left the Building');
   const otherList = STATE.students.filter((s) => s.status === otherStatus);
 
-  // Update Sub-Navigation Tab Labels & Active States (without 'Read-Only' text on tab button)
+  // Update Sub-Navigation Tab Labels & Active States
   const tabPrimary = document.getElementById('co-tab-primary');
   const tabLeft = document.getElementById('co-tab-left');
   const tabOther = document.getElementById('co-tab-other');
@@ -777,10 +773,15 @@ function renderCheckoutScreen() {
     btnRestore.textContent = `Restore to ${primaryStatus} (${STATE.selectedCheckoutIds.size} Selected)`;
   }
 
-  // Filter & sort current sub-view list A->Z by Last Name
+  // Filter & sort current sub-view list:
+  // 'Left the Building' -> Most recently marked at top; others -> A->Z by Last Name
   let sourceList = primaryList;
   if (STATE.checkoutSubTab === 'left') sourceList = leftList;
   if (STATE.checkoutSubTab === 'other') sourceList = otherList;
+
+  const sortComparator = STATE.checkoutSubTab === 'left'
+    ? compareStudentsByMostRecent
+    : compareStudentsByLastThenFirst;
 
   const query = STATE.searchQueryCheckout.trim().toLowerCase();
   const filteredList = sourceList
@@ -788,7 +789,7 @@ function renderCheckoutScreen() {
       if (!query) return true;
       return st.first.toLowerCase().includes(query) || st.last.toLowerCase().includes(query);
     })
-    .sort(compareStudentsByLastThenFirst);
+    .sort(sortComparator);
 
   const grid = document.getElementById('co-grid');
   grid.innerHTML = '';
@@ -850,18 +851,13 @@ function bindModalEvents() {
     });
   });
 
-  // Action 3: Left the Building -> immediate update + 5s UNDO banner (no confirmation)
+  // Action 3: Left the Building -> immediate update (no confirmation)
   document.getElementById('modal-btn-left').addEventListener('click', () => {
     const st = STATE.students.find((s) => s.rowIndex === STATE.activeModalStudentRow);
     closeStudentDetailModal();
     if (!st) return;
 
     const nowIso = getLocalIsoTimestamp();
-    const undoRecords = [{
-      rowIndex: st.rowIndex,
-      priorStatus: st.status,
-      priorTime: st.time
-    }];
 
     st.status = 'Left the Building';
     st.time = nowIso;
@@ -870,7 +866,6 @@ function bindModalEvents() {
       action: 'updateStudents',
       updates: [{ rowIndex: st.rowIndex, status: 'Left the Building', time: nowIso }]
     });
-    showUndoBanner(undoRecords);
   });
 }
 
@@ -916,70 +911,6 @@ function closeStudentDetailModal() {
 function updateModalElapsedText(st) {
   const secs = getElapsedSeconds(st.time);
   document.getElementById('modal-elapsed').textContent = `Elapsed Wait: ${formatMMSS(secs)}`;
-}
-
-/* ==========================================================================
-   5-SECOND NON-BLOCKING UNDO TOAST BANNER
-   ========================================================================== */
-function bindUndoEvents() {
-  document.getElementById('undo-btn').addEventListener('click', () => {
-    if (!STATE.undoPayload || STATE.undoPayload.length === 0) return;
-
-    const recordsToRestore = STATE.undoPayload.slice();
-    hideUndoBanner();
-
-    const updates = [];
-    recordsToRestore.forEach((rec) => {
-      const st = STATE.students.find((s) => s.rowIndex === rec.rowIndex);
-      if (st) {
-        st.status = rec.priorStatus;
-        st.time = rec.priorTime;
-        updates.push({
-          rowIndex: st.rowIndex,
-          status: rec.priorStatus,
-          time: rec.priorTime
-        });
-      }
-    });
-
-    renderAll();
-    sendMutation({ action: 'updateStudents', updates });
-  });
-}
-
-function showUndoBanner(undoRecords) {
-  if (STATE.undoTimerId) {
-    clearTimeout(STATE.undoTimerId);
-    STATE.undoTimerId = null;
-  }
-
-  STATE.undoPayload = undoRecords;
-  const count = undoRecords.length;
-  const label = count === 1 ? '1 student' : `${count} students`;
-  document.getElementById('undo-message').textContent = `Marked ${label} as Left the Building`;
-
-  const toast = document.getElementById('undo-toast');
-  const bar = document.getElementById('undo-progress-bar');
-
-  toast.classList.remove('hidden');
-  bar.style.transition = 'none';
-  bar.style.transform = 'scaleX(1)';
-  void bar.offsetWidth; // Force reflow
-  bar.style.transition = `transform ${CONFIG.UNDO_DURATION_MS}ms linear`;
-  bar.style.transform = 'scaleX(0)';
-
-  STATE.undoTimerId = setTimeout(() => {
-    hideUndoBanner();
-  }, CONFIG.UNDO_DURATION_MS);
-}
-
-function hideUndoBanner() {
-  if (STATE.undoTimerId) {
-    clearTimeout(STATE.undoTimerId);
-    STATE.undoTimerId = null;
-  }
-  STATE.undoPayload = null;
-  document.getElementById('undo-toast').classList.add('hidden');
 }
 
 /* ==========================================================================
@@ -1100,10 +1031,21 @@ function compareStudentsByLastThenFirst(a, b) {
   return a.first.localeCompare(b.first, undefined, { sensitivity: 'base' });
 }
 
-function getElapsedSeconds(isoString) {
+function compareStudentsByMostRecent(a, b) {
+  const timeDiff = getTimestampMs(b.time) - getTimestampMs(a.time);
+  if (timeDiff !== 0) return timeDiff;
+  return compareStudentsByLastThenFirst(a, b);
+}
+
+function getTimestampMs(isoString) {
   if (!isoString) return 0;
   const parsed = Date.parse(isoString);
-  if (isNaN(parsed)) return 0;
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+function getElapsedSeconds(isoString) {
+  const parsed = getTimestampMs(isoString);
+  if (!parsed) return 0;
   return Math.max(0, Math.floor((Date.now() - parsed) / 1000));
 }
 
