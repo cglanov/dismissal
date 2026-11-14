@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>SDMS — School Dismissal Management System</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-layout="desktop">
+
+  <!-- =====================================================================
+       SCREEN 0: SHARED STAFF PIN GATE (PIN: 2013)
+       ===================================================================== -->
+  <div id="pin-screen" class="pin-overlay">
+    <div class="pin-card" id="pin-card">
+      <div class="pin-brand">
+        <span class="pin-badge">PreK–Grade 5</span>
+        <h1>School Dismissal</h1>
+        <p>Enter 4-Digit Staff PIN to Unlock</p>
+      </div>
+
+      <div class="pin-dots" id="pin-dots" aria-label="PIN entry progress">
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+      </div>
+
+      <div id="pin-error" class="pin-error" role="alert" aria-live="polite"></div>
+
+      <div class="pin-keypad">
+        <button type="button" class="pin-key" data-digit="1">1</button>
+        <button type="button" class="pin-key" data-digit="2">2</button>
+        <button type="button" class="pin-key" data-digit="3">3</button>
+        <button type="button" class="pin-key" data-digit="4">4</button>
+        <button type="button" class="pin-key" data-digit="5">5</button>
+        <button type="button" class="pin-key" data-digit="6">6</button>
+        <button type="button" class="pin-key" data-digit="7">7</button>
+        <button type="button" class="pin-key" data-digit="8">8</button>
+        <button type="button" class="pin-key" data-digit="9">9</button>
+        <button type="button" class="pin-key pin-key-util" id="pin-clear">Clear</button>
+        <button type="button" class="pin-key" data-digit="0">0</button>
+        <button type="button" class="pin-key pin-key-util" id="pin-backspace" aria-label="Backspace">⌫</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MAIN APPLICATION SHELL (SCREENS 1–6)
+       ===================================================================== -->
+  <div id="app-shell" class="app-shell hidden">
+
+    <!-- Persistent Top Header -->
+    <header class="top-header">
+      <div class="header-left">
+        <button type="button" id="btn-back-start" class="btn-header btn-back hidden">
+          ← Start Screen
+        </button>
+        <h1 id="header-title" class="header-title">SDMS Dismissal</h1>
+      </div>
+
+      <div class="header-right">
+        <span id="sync-badge" class="sync-badge sync-live">Live • Synced</span>
+        <button type="button" id="btn-layout-toggle" class="btn-header btn-toggle" title="Switch Desktop / Mobile Layout">
+          Desktop | Mobile
+        </button>
+        <button type="button" id="btn-lock" class="btn-header btn-lock" title="Lock Station">
+          Lock
+        </button>
+      </div>
+    </header>
+
+    <!-- Demo Mode Banner (Shown only if API_URL is unconfigured) -->
+    <div id="demo-banner" class="demo-banner hidden">
+      Demo Mode Active — Paste your Google Apps Script Web App URL into <code>app.js</code> (<code>CONFIG.API_URL</code>) for live Google Sheets sync.
+    </div>
+
+    <!-- ===================================================================
+         SCREEN 1: START SCREEN (STATION SELECTOR)
+         =================================================================== -->
+    <main id="screen-start" class="screen screen-start">
+      <div class="start-grid">
+        <button type="button" class="station-card card-buses" data-nav="buses">
+          <div class="station-card-top">
+            <span class="station-icon">🚌</span>
+            <span class="station-count-pill" id="badge-buses-count">0 active</span>
+          </div>
+          <h2>Call Buses</h2>
+          <p>Post arriving buses &amp; loading zones from 30 recent history</p>
+        </button>
+
+        <button type="button" class="station-card card-valet" data-nav="valet-entry">
+          <div class="station-card-top">
+            <span class="station-icon">🚗</span>
+            <span class="station-count-pill" id="badge-valet-count">0 in queue</span>
+          </div>
+          <h2>Valet - Name Entry</h2>
+          <p>Call waiting students to Valet &amp; monitor wait timers</p>
+        </button>
+
+        <button type="button" class="station-card card-pickup" data-nav="pickup-entry">
+          <div class="station-card-top">
+            <span class="station-icon">🚪</span>
+            <span class="station-count-pill" id="badge-pickup-count">0 in queue</span>
+          </div>
+          <h2>Pickup Door - Name Entry</h2>
+          <p>Call waiting students to Pick Up Door &amp; monitor wait timers</p>
+        </button>
+
+        <button type="button" class="station-card card-checkout" data-nav="valet-checkout">
+          <div class="station-card-top">
+            <span class="station-icon">✅</span>
+            <span class="station-count-pill" id="badge-valet-co-count">0 ready</span>
+          </div>
+          <h2>Needed at Valet - Checkout</h2>
+          <p>Mark Valet students as Left the Building, recall, or inspect Pick Up</p>
+        </button>
+
+        <button type="button" class="station-card card-checkout" data-nav="pickup-checkout">
+          <div class="station-card-top">
+            <span class="station-icon">✅</span>
+            <span class="station-count-pill" id="badge-pickup-co-count">0 ready</span>
+          </div>
+          <h2>Needed at Pickup Door - Checkout</h2>
+          <p>Mark Pick Up Door students as Left the Building, recall, or inspect Valet</p>
+        </button>
+      </div>
+    </main>
+
+    <!-- ===================================================================
+         SCREEN 2: CALL BUSES SCREEN
+         =================================================================== -->
+    <main id="screen-buses" class="screen screen-buses hidden">
+      <section class="buses-pane buses-active-pane">
+        <div class="pane-header">
+          <h2>Active Bus Slots <span class="sub-tag">(Writes Col A)</span></h2>
+          <div class="pane-actions">
+            <button type="button" id="btn-add-bus-slot" class="btn-secondary">+ Add Slot</button>
+            <button type="button" id="btn-clear-all-buses" class="btn-danger-outline">Clear All</button>
+            <button type="button" id="btn-save-buses" class="btn-primary">Save / Sync Buses</button>
+          </div>
+        </div>
+        <div id="bus-slots-container" class="bus-slots-list"></div>
+      </section>
+
+      <section class="buses-pane buses-mru-pane">
+        <div class="pane-header">
+          <h2>30 Most Recently Used <span class="sub-tag">(Col B — Tap to Fill)</span></h2>
+          <span id="bus-mru-count" class="count-pill">0 / 30</span>
+        </div>
+        <div id="bus-mru-list" class="bus-mru-grid"></div>
+      </section>
+    </main>
+
+    <!-- ===================================================================
+         SCREENS 3 & 4: VALET / PICKUP DOOR - NAME ENTRY
+         =================================================================== -->
+    <main id="screen-name-entry" class="screen screen-name-entry hidden">
+      <!-- Zone A: Waiting Students Selector -->
+      <section class="ne-zone ne-waiting-zone">
+        <div class="zone-toolbar">
+          <div class="zone-title-row">
+            <h2 id="ne-waiting-title">Waiting Students</h2>
+            <span id="ne-waiting-count" class="count-pill">0</span>
+          </div>
+          <div class="search-submit-bar">
+            <div class="search-input-wrap">
+              <input
+                type="text"
+                id="ne-search-input"
+                placeholder="Search first or last name..."
+                autocomplete="off"
+                autocorrect="off"
+                spellcheck="false"
+              />
+              <button type="button" id="ne-search-clear" class="btn-clear-input hidden" aria-label="Clear search">×</button>
+            </div>
+            <button type="button" id="ne-submit-btn" class="btn-check-submit" disabled title="Dispatch Selected Students">
+              ✓ <span id="ne-selected-count">0</span>
+            </button>
+          </div>
+        </div>
+        <div id="ne-waiting-grid" class="student-grid grid-3-col"></div>
+      </section>
+
+      <!-- Zone B: Active Queue Monitor (10-Minute Color Gradient) -->
+      <section class="ne-zone ne-active-zone">
+        <div class="zone-toolbar">
+          <div class="zone-title-row">
+            <h2 id="ne-active-title">Needed at Valet</h2>
+            <span id="ne-active-count" class="count-pill">0</span>
+          </div>
+          <div class="gradient-legend">
+            <span class="legend-dot" style="background:#16A34A"></span> 0m
+            <span class="legend-dot" style="background:#EAB308"></span> 4m
+            <span class="legend-dot" style="background:#F97316"></span> 7m
+            <span class="legend-dot" style="background:#DC2626"></span> 10m+
+          </div>
+        </div>
+        <div id="ne-active-grid" class="student-grid grid-3-col"></div>
+      </section>
+    </main>
+
+    <!-- ===================================================================
+         SCREENS 5 & 6: NEEDED AT VALET / PICKUP DOOR - CHECKOUT
+         =================================================================== -->
+    <main id="screen-checkout" class="screen screen-checkout hidden">
+      <div class="co-subnav">
+        <button type="button" id="co-tab-primary" class="co-tab active">
+          Needed at Valet (0)
+        </button>
+        <button type="button" id="co-tab-left" class="co-tab">
+          Left the Building (0)
+        </button>
+        <button type="button" id="co-tab-other" class="co-tab">
+          Needed at Pick Up Door (RO)
+        </button>
+      </div>
+
+      <!-- Strictly Read-Only Banner for Cross-Queue View -->
+      <div id="co-readonly-banner" class="readonly-banner hidden">
+        READ-ONLY VIEW — Viewing Other Station Queue (Edits Disabled)
+      </div>
+
+      <!-- Search Filter Bar (Active in Checkout & Left Recall Views) -->
+      <div id="co-search-wrap" class="co-search-bar">
+        <div class="search-input-wrap">
+          <input
+            type="text"
+            id="co-search-input"
+            placeholder="Filter by first or last name..."
+            autocomplete="off"
+            autocorrect="off"
+            spellcheck="false"
+          />
+          <button type="button" id="co-search-clear" class="btn-clear-input hidden" aria-label="Clear filter">×</button>
+        </div>
+      </div>
+
+      <div id="co-grid" class="student-grid co-grid"></div>
+
+      <!-- Bottom Sticky Batch Action Bar -->
+      <div id="co-action-bar" class="co-action-bar">
+        <button type="button" id="btn-mark-gone" class="btn-mark-gone" disabled>
+          Mark as Gone (0 Selected)
+        </button>
+        <button type="button" id="btn-restore-selected" class="btn-restore-queue hidden" disabled>
+          Restore Selected to Active Queue (0 Selected)
+        </button>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- =====================================================================
+       STUDENT DETAIL POPUP MODAL (ZONE B ACTIVE QUEUE TAP)
+       ===================================================================== -->
+  <div id="student-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-student-name">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 id="modal-student-name">Student Name</h3>
+          <span id="modal-elapsed" class="modal-elapsed">Elapsed: 00:00</span>
+        </div>
+        <span id="modal-student-grade" class="modal-grade-badge">Grade 3</span>
+      </div>
+
+      <div class="modal-body">
+        <div class="detail-row">
+          <span class="detail-label">Classroom Teacher</span>
+          <span id="modal-teacher" class="detail-value">—</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Phone Extension</span>
+          <span id="modal-ext" class="detail-value">—</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Assigned Bus</span>
+          <span id="modal-bus" class="detail-value">None</span>
+        </div>
+        <div class="detail-contacts">
+          <span class="detail-label">Authorized Pickup Contacts</span>
+          <ul id="modal-contacts-list" class="contacts-list"></ul>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="modal-btn-close" class="btn-modal btn-modal-close">
+          Close
+        </button>
+        <button type="button" id="modal-btn-remove" class="btn-modal btn-modal-remove">
+          Remove from List
+        </button>
+        <button type="button" id="modal-btn-left" class="btn-modal btn-modal-left">
+          Left the Building
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       5-SECOND NON-BLOCKING UNDO TOAST BANNER
+       ===================================================================== -->
+  <div id="undo-toast" class="undo-toast hidden" role="status" aria-live="assertive">
+    <div class="undo-toast-content">
+      <span id="undo-message">Marked 1 student as Left the Building</span>
+      <button type="button" id="undo-btn" class="btn-undo">UNDO</button>
+    </div>
+    <div class="undo-progress-track">
+      <div id="undo-progress-bar" class="undo-progress-bar"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
