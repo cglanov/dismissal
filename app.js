@@ -5,7 +5,7 @@
 
 const CONFIG = {
   // Replace with your deployed Google Apps Script Web App URL:
-  API_URL: 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwuhV1WDETx0R8-MMFaBiXjEkdDCq_jsGH49ALedQuhP6ALcibfC4i9-g6hCMHdCcWu/exec',
   STAFF_PIN: '2013',
   POLL_INTERVAL_MS: 3500, // 3.5s polling (<50 concurrent clients hit GAS 3s cache)
   UNDO_DURATION_MS: 5000, // 5-second UNDO toast banner
