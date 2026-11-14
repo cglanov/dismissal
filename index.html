@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>SDMS — School Dismissal Management System</title>
+  <title>DISMISSAL — School Dismissal Management System</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-layout="desktop">
@@ -15,7 +15,7 @@
     <div class="pin-card" id="pin-card">
       <div class="pin-brand">
         <span class="pin-badge">PreK–Grade 5</span>
-        <h1>School Dismissal</h1>
+        <h1>DISMISSAL</h1>
         <p>Enter 4-Digit Staff PIN to Unlock</p>
       </div>
 
@@ -56,7 +56,7 @@
         <button type="button" id="btn-back-start" class="btn-header btn-back hidden">
           ← Start Screen
         </button>
-        <h1 id="header-title" class="header-title">SDMS Dismissal</h1>
+        <h1 id="header-title" class="header-title">DISMISSAL</h1>
       </div>
 
       <div class="header-right">
@@ -86,7 +86,6 @@
             <span class="station-count-pill" id="badge-buses-count">0 active</span>
           </div>
           <h2>Call Buses</h2>
-          <p>Post arriving buses &amp; loading zones from 30 recent history</p>
         </button>
 
         <button type="button" class="station-card card-valet" data-nav="valet-entry">
@@ -95,7 +94,6 @@
             <span class="station-count-pill" id="badge-valet-count">0 in queue</span>
           </div>
           <h2>Valet - Name Entry</h2>
-          <p>Call waiting students to Valet &amp; monitor wait timers</p>
         </button>
 
         <button type="button" class="station-card card-pickup" data-nav="pickup-entry">
@@ -104,7 +102,6 @@
             <span class="station-count-pill" id="badge-pickup-count">0 in queue</span>
           </div>
           <h2>Pickup Door - Name Entry</h2>
-          <p>Call waiting students to Pick Up Door &amp; monitor wait timers</p>
         </button>
 
         <button type="button" class="station-card card-checkout" data-nav="valet-checkout">
@@ -113,7 +110,6 @@
             <span class="station-count-pill" id="badge-valet-co-count">0 ready</span>
           </div>
           <h2>Needed at Valet - Checkout</h2>
-          <p>Mark Valet students as Left the Building, recall, or inspect Pick Up</p>
         </button>
 
         <button type="button" class="station-card card-checkout" data-nav="pickup-checkout">
@@ -122,7 +118,6 @@
             <span class="station-count-pill" id="badge-pickup-co-count">0 ready</span>
           </div>
           <h2>Needed at Pickup Door - Checkout</h2>
-          <p>Mark Pick Up Door students as Left the Building, recall, or inspect Valet</p>
         </button>
       </div>
     </main>
@@ -133,7 +128,7 @@
     <main id="screen-buses" class="screen screen-buses hidden">
       <section class="buses-pane buses-active-pane">
         <div class="pane-header">
-          <h2>Active Bus Slots <span class="sub-tag">(Writes Col A)</span></h2>
+          <h2>Loading Buses</h2>
           <div class="pane-actions">
             <button type="button" id="btn-add-bus-slot" class="btn-secondary">+ Add Slot</button>
             <button type="button" id="btn-clear-all-buses" class="btn-danger-outline">Clear All</button>
@@ -145,8 +140,7 @@
 
       <section class="buses-pane buses-mru-pane">
         <div class="pane-header">
-          <h2>30 Most Recently Used <span class="sub-tag">(Col B — Tap to Fill)</span></h2>
-          <span id="bus-mru-count" class="count-pill">0 / 30</span>
+          <h2>Recent Buses/Transportation</h2>
         </div>
         <div id="bus-mru-list" class="bus-mru-grid"></div>
       </section>
@@ -213,7 +207,7 @@
           Left the Building (0)
         </button>
         <button type="button" id="co-tab-other" class="co-tab">
-          Needed at Pick Up Door (RO)
+          Needed at Pick Up Door (0)
         </button>
       </div>
 
@@ -222,7 +216,7 @@
         READ-ONLY VIEW — Viewing Other Station Queue (Edits Disabled)
       </div>
 
-      <!-- Search Filter Bar (Active in Checkout & Left Recall Views) -->
+      <!-- Search Filter Bar -->
       <div id="co-search-wrap" class="co-search-bar">
         <div class="search-input-wrap">
           <input
@@ -260,7 +254,7 @@
       <div class="modal-header">
         <div>
           <h3 id="modal-student-name">Student Name</h3>
-          <span id="modal-elapsed" class="modal-elapsed">Elapsed: 00:00</span>
+          <span id="modal-elapsed" class="modal-elapsed">Elapsed: 0:00</span>
         </div>
         <span id="modal-student-grade" class="modal-grade-badge">Grade 3</span>
       </div>
