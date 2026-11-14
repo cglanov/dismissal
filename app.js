@@ -5,7 +5,7 @@
 
 const CONFIG = {
   // Replace with your deployed Google Apps Script Web App URL:
-  API_URL: 'https://script.google.com/macros/s/AKfycbwuhV1WDETx0R8-MMFaBiXjEkdDCq_jsGH49ALedQuhP6ALcibfC4i9-g6hCMHdCcWu/exec',
+  API_URL: 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL',
   STAFF_PIN: '2013',
   POLL_INTERVAL_MS: 3500, // 3.5s polling (<50 concurrent clients hit GAS 3s cache)
   UNDO_DURATION_MS: 5000, // 5-second UNDO toast banner
@@ -249,7 +249,7 @@ function navigateTo(screenId) {
 
   if (screenId === 'start') {
     backBtn.classList.add('hidden');
-    titleEl.textContent = 'SDMS Dismissal';
+    titleEl.textContent = 'DISMISSAL';
     document.getElementById('screen-start').classList.remove('hidden');
   } else if (screenId === 'buses') {
     backBtn.classList.remove('hidden');
@@ -285,7 +285,7 @@ function navigateTo(screenId) {
    ========================================================================== */
 async function fetchLatestState() {
   if (STATE.inFlightMutations > 0 || STATE.retryQueue.length > 0) {
-    return; // Wait until optimistic mutations confirm so UI never flickers
+    return;
   }
 
   try {
@@ -348,7 +348,6 @@ async function sendMutation(payload) {
   STATE.inFlightMutations++;
 
   try {
-    // Use text/plain to bypass CORS preflight on Google Apps Script Web Apps
     const res = await fetch(CONFIG.API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -467,7 +466,6 @@ function renderBusesScreen() {
     clearBtn.textContent = '×';
     clearBtn.title = 'Remove this bus';
     clearBtn.addEventListener('click', () => {
-      // Remove this entry and shift remaining active buses up
       STATE.busInputSlots.splice(idx, 1);
       STATE.busInputSlots.push('');
       STATE.busSlotsDirty = false;
@@ -478,13 +476,12 @@ function renderBusesScreen() {
     slotsContainer.appendChild(row);
   });
 
-  // Render 30 MRU Checklist (Column B)
+  // Render Recent Buses/Transportation Checklist (Column B)
   const mruContainer = document.getElementById('bus-mru-list');
-  document.getElementById('bus-mru-count').textContent = `${STATE.mruBuses.length} / 30`;
   mruContainer.innerHTML = '';
 
   if (STATE.mruBuses.length === 0) {
-    mruContainer.innerHTML = '<div class="empty-state">No recent bus strings yet. Type a bus above and save to build your 30-item list.</div>';
+    mruContainer.innerHTML = '<div class="empty-state">No recent buses yet. Type a bus above and save to build your recent list.</div>';
     return;
   }
 
@@ -501,7 +498,6 @@ function renderBusesScreen() {
 
     checkbox.addEventListener('change', () => {
       if (checkbox.checked) {
-        // Auto-populate top-most empty input slot (or append new slot if all full)
         const emptyIdx = STATE.busInputSlots.findIndex((s) => s.trim() === '');
         if (emptyIdx !== -1) {
           STATE.busInputSlots[emptyIdx] = busStr;
@@ -509,7 +505,6 @@ function renderBusesScreen() {
           STATE.busInputSlots.push(busStr);
         }
       } else {
-        // Remove matching entry and shift remaining active buses up
         STATE.busInputSlots = STATE.busInputSlots.filter((s) => s.trim() !== busStr);
         while (STATE.busInputSlots.length < CONFIG.INITIAL_BUS_SLOTS) {
           STATE.busInputSlots.push('');
@@ -553,7 +548,6 @@ function bindNameEntryEvents() {
   submitBtn.addEventListener('click', () => {
     if (STATE.selectedWaitingIds.size === 0) return;
 
-    // Exact string literals required by Section 4.1
     const targetStatus = STATE.currentScreen === 'valet-entry'
       ? 'Needed at Valet'
       : 'Needed at Pick Up Door';
@@ -590,7 +584,6 @@ function renderNameEntryScreen() {
     .filter((st) => st.status === 'waiting')
     .filter((st) => {
       if (!query) return true;
-      // Search strictly by Column A ('first') or Column B ('last') — Contacts 1–4 excluded
       return (
         st.first.toLowerCase().includes(query) ||
         st.last.toLowerCase().includes(query)
@@ -611,8 +604,7 @@ function renderNameEntryScreen() {
     waitingStudents.forEach((st) => {
       const isSelected = STATE.selectedWaitingIds.has(st.rowIndex);
       const btn = createStudentButtonElement(st, {
-        extraClass: isSelected ? 'selected' : '',
-        showTimer: false
+        extraClass: isSelected ? 'selected' : ''
       });
 
       btn.addEventListener('click', () => {
@@ -628,7 +620,7 @@ function renderNameEntryScreen() {
     });
   }
 
-  // Zone B: Active Queue Monitor (10-minute color gradient)
+  // Zone B: Active Queue Monitor (10-minute color gradient only; no timer counter on buttons)
   const activeStudents = STATE.students
     .filter((st) => st.status === targetStatus)
     .sort(compareStudentsByLastThenFirst);
@@ -643,8 +635,7 @@ function renderNameEntryScreen() {
   } else {
     activeStudents.forEach((st) => {
       const btn = createStudentButtonElement(st, {
-        extraClass: 'active-gradient-btn',
-        showTimer: true
+        extraClass: 'active-gradient-btn'
       });
       btn.dataset.rowIndex = st.rowIndex;
       applyGradientStyleToButton(btn, st.time);
@@ -754,14 +745,14 @@ function renderCheckoutScreen() {
   const leftList = STATE.students.filter((s) => s.status === 'Left the Building');
   const otherList = STATE.students.filter((s) => s.status === otherStatus);
 
-  // Update Sub-Navigation Tab Labels & Active States
+  // Update Sub-Navigation Tab Labels & Active States (without 'Read-Only' text on tab button)
   const tabPrimary = document.getElementById('co-tab-primary');
   const tabLeft = document.getElementById('co-tab-left');
   const tabOther = document.getElementById('co-tab-other');
 
   tabPrimary.textContent = `${primaryStatus} (${primaryList.length})`;
   tabLeft.textContent = `Left the Building (${leftList.length})`;
-  tabOther.textContent = `${otherStatus} (Read-Only: ${otherList.length})`;
+  tabOther.textContent = `${otherStatus} (${otherList.length})`;
 
   tabPrimary.classList.toggle('active', STATE.checkoutSubTab === 'primary');
   tabLeft.classList.toggle('active', STATE.checkoutSubTab === 'left');
@@ -814,10 +805,8 @@ function renderCheckoutScreen() {
     if (isReadOnly) extraClass = 'readonly-card';
     if (!isReadOnly && isSelected) extraClass += ' selected';
 
-    // Strictly NO 10-minute color gradient on Checkout buttons
     const btn = createStudentButtonElement(st, {
       extraClass,
-      showTimer: false,
       isReadOnly
     });
 
@@ -996,7 +985,7 @@ function hideUndoBanner() {
 /* ==========================================================================
    SHARED UI HELPERS & CONTINUOUS 10-MINUTE COLOR GRADIENT ENGINE
    ========================================================================== */
-function createStudentButtonElement(student, { extraClass = '', showTimer = false, isReadOnly = false } = {}) {
+function createStudentButtonElement(student, { extraClass = '', isReadOnly = false } = {}) {
   const btn = document.createElement(isReadOnly ? 'div' : 'button');
   if (!isReadOnly) btn.type = 'button';
   btn.className = `student-btn ${extraClass}`.trim();
@@ -1024,13 +1013,6 @@ function createStudentButtonElement(student, { extraClass = '', showTimer = fals
   gradeBadge.className = 'grade-badge';
   gradeBadge.textContent = student.grade || '—';
   rightMeta.appendChild(gradeBadge);
-
-  if (showTimer) {
-    const timerPill = document.createElement('span');
-    timerPill.className = 'elapsed-pill';
-    timerPill.textContent = formatMMSS(getElapsedSeconds(student.time));
-    rightMeta.appendChild(timerPill);
-  }
 
   btn.append(namesWrap, rightMeta);
   return btn;
@@ -1071,10 +1053,6 @@ function computeEscalationColor(elapsedSeconds) {
 function applyGradientStyleToButton(btn, isoTime) {
   const secs = getElapsedSeconds(isoTime);
   btn.style.backgroundColor = computeEscalationColor(secs);
-  const timerEl = btn.querySelector('.elapsed-pill');
-  if (timerEl) {
-    timerEl.textContent = formatMMSS(secs);
-  }
 }
 
 function tickLiveTimers() {
