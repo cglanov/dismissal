@@ -387,13 +387,13 @@ body[data-layout="mobile"] .station-card h2 {
 }
 
 /* ==========================================================================
-   SCREEN 2: CALL BUSES SCREEN
+   SCREEN 2: CALL BUSES SCREEN (DYNAMIC FULL-HEIGHT FIT IN DESKTOP MODE)
    ========================================================================== */
 body[data-layout="desktop"] .screen-buses {
   display: flex;
   flex-direction: row;
-  gap: 14px;
-  padding: 14px;
+  gap: 12px;
+  padding: 12px;
 }
 
 body[data-layout="desktop"] .buses-active-pane {
@@ -432,6 +432,10 @@ body[data-layout="mobile"] .buses-mru-pane {
   overflow: hidden;
 }
 
+body[data-layout="desktop"] .buses-pane {
+  padding: 10px 12px;
+}
+
 .pane-header {
   display: flex;
   align-items: center;
@@ -441,6 +445,10 @@ body[data-layout="mobile"] .buses-mru-pane {
   padding-bottom: 10px;
   border-bottom: 1px solid #e2e8f0;
   flex-shrink: 0;
+}
+
+body[data-layout="desktop"] .pane-header {
+  padding-bottom: 8px;
 }
 
 .pane-header h2 {
@@ -460,9 +468,9 @@ body[data-layout="mobile"] .buses-mru-pane {
   color: #ffffff;
   border: none;
   border-radius: 8px;
-  padding: 8px 14px;
+  padding: 7px 13px;
   font-weight: 700;
-  font-size: 0.86rem;
+  font-size: 0.85rem;
   cursor: pointer;
 }
 
@@ -475,9 +483,9 @@ body[data-layout="mobile"] .buses-mru-pane {
   color: var(--text-dark);
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  padding: 8px 11px;
+  padding: 7px 10px;
   font-weight: 600;
-  font-size: 0.84rem;
+  font-size: 0.83rem;
   cursor: pointer;
 }
 
@@ -486,9 +494,9 @@ body[data-layout="mobile"] .buses-mru-pane {
   color: #be123c;
   border: 1px solid #fecdd3;
   border-radius: 8px;
-  padding: 8px 11px;
+  padding: 7px 10px;
   font-weight: 600;
-  font-size: 0.84rem;
+  font-size: 0.83rem;
   cursor: pointer;
 }
 
@@ -502,10 +510,23 @@ body[data-layout="mobile"] .buses-mru-pane {
   gap: 8px;
 }
 
+/* Desktop Mode: Fit all slots on screen with reduced gap & dynamic height */
+body[data-layout="desktop"] .bus-slots-list {
+  padding-top: 6px;
+  gap: 3px;
+  overflow: hidden;
+}
+
 .bus-slot-row {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+body[data-layout="desktop"] .bus-slot-row {
+  flex: 1 1 0;
+  min-height: 0;
+  gap: 6px;
 }
 
 .bus-slot-num {
@@ -515,6 +536,11 @@ body[data-layout="mobile"] .buses-mru-pane {
   color: var(--text-muted);
   text-align: right;
   flex-shrink: 0;
+}
+
+body[data-layout="desktop"] .bus-slot-num {
+  width: 24px;
+  font-size: clamp(0.7rem, calc(52vh / var(--slot-count, 12)), 0.85rem);
 }
 
 .bus-slot-input {
@@ -528,10 +554,18 @@ body[data-layout="mobile"] .buses-mru-pane {
   color: var(--text-dark);
 }
 
+body[data-layout="desktop"] .bus-slot-input {
+  height: 100%;
+  min-height: 0;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: clamp(0.74rem, calc(56vh / var(--slot-count, 12)), 0.98rem);
+}
+
 .bus-slot-input:focus {
   outline: none;
   border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
 }
 
 .btn-slot-clear {
@@ -544,6 +578,18 @@ body[data-layout="mobile"] .buses-mru-pane {
   font-size: 1.2rem;
   font-weight: 700;
   cursor: pointer;
+}
+
+body[data-layout="desktop"] .btn-slot-clear {
+  width: 34px;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(0.85rem, calc(60vh / var(--slot-count, 12)), 1.15rem);
 }
 
 .btn-slot-clear:hover {
@@ -562,8 +608,14 @@ body[data-layout="mobile"] .buses-mru-pane {
   align-content: start;
 }
 
+/* Desktop Mode: Fit all recent bus buttons on screen height across 2 columns */
 body[data-layout="desktop"] .bus-mru-grid {
-  grid-template-columns: repeat(2, 1fr);
+  padding-top: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(var(--mru-rows, 15), minmax(0, 1fr));
+  align-content: stretch;
+  gap: 4px;
+  overflow: hidden;
 }
 
 body[data-layout="mobile"] .bus-mru-grid {
@@ -583,6 +635,15 @@ body[data-layout="mobile"] .bus-mru-grid {
   min-height: 46px;
 }
 
+body[data-layout="desktop"] .mru-item {
+  min-height: 0;
+  height: 100%;
+  padding: 2px 10px;
+  gap: 8px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
 .mru-item.checked {
   background: #eff6ff;
   border-color: #2563eb;
@@ -596,6 +657,11 @@ body[data-layout="mobile"] .bus-mru-grid {
   flex-shrink: 0;
 }
 
+body[data-layout="desktop"] .mru-item input[type="checkbox"] {
+  width: clamp(14px, calc(48vh / var(--mru-rows, 15)), 19px);
+  height: clamp(14px, calc(48vh / var(--mru-rows, 15)), 19px);
+}
+
 .mru-label {
   font-weight: 600;
   font-size: 0.95rem;
@@ -603,8 +669,16 @@ body[data-layout="mobile"] .bus-mru-grid {
   word-break: break-word;
 }
 
+body[data-layout="desktop"] .mru-label {
+  font-size: clamp(0.74rem, calc(52vh / var(--mru-rows, 15)), 0.94rem);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ==========================================================================
-   SCREENS 3 & 4: NAME ENTRY (DESKTOP HORIZONTAL VS MOBILE EXACT 50/50 FLEX)
+   SCREENS 3 & 4: NAME ENTRY (DESKTOP HORIZONTAL VS MOBILE 65/35 VERTICAL SPLIT)
    ========================================================================== */
 body[data-layout="desktop"] .screen-name-entry {
   display: flex;
@@ -628,8 +702,16 @@ body[data-layout="mobile"] .screen-name-entry {
   padding-bottom: max(8px, env(safe-area-inset-bottom));
 }
 
-body[data-layout="mobile"] .ne-zone {
-  flex: 1 1 0;
+/* Top Waiting Pool gets 65%; Bottom 'Needed' Queue is 30% smaller (35%) */
+body[data-layout="mobile"] .ne-waiting-zone {
+  flex: 65 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+body[data-layout="mobile"] .ne-active-zone {
+  flex: 35 1 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -785,10 +867,10 @@ body[data-layout="mobile"] .co-grid {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 5px;
+  gap: 3px;
   width: 100%;
   min-height: 52px;
-  padding: 7px 8px;
+  padding: 6px 4px 6px 8px;
   border-radius: 9px;
   border: 2px solid transparent;
   background-color: var(--btn-waiting);
@@ -800,7 +882,7 @@ body[data-layout="mobile"] .co-grid {
 
 body[data-layout="mobile"] .student-btn {
   min-height: 54px;
-  padding: 7px 7px;
+  padding: 6px 4px 6px 7px;
 }
 
 .student-btn:active:not(.readonly-card) {
@@ -837,12 +919,11 @@ body[data-layout="mobile"] .student-btn {
   text-overflow: ellipsis;
 }
 
-/* Right Side: Column E ('grade') small pill/badge */
+/* Right Side: Compact Grade Badge Tucked Close to Right Edge */
 .student-right-meta {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 3px;
   flex-shrink: 0;
 }
 
@@ -850,11 +931,12 @@ body[data-layout="mobile"] .student-btn {
   display: inline-block;
   background: rgba(0, 0, 0, 0.28);
   color: #ffffff;
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   font-weight: 800;
-  padding: 2px 6px;
-  border-radius: 5px;
-  line-height: 1.1;
+  padding: 1px 4px;
+  border-radius: 4px;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
 }
 
 /* Selected State on Waiting Pool */
@@ -911,7 +993,7 @@ body[data-layout="mobile"] .student-btn {
 }
 
 /* ==========================================================================
-   SCREENS 5 & 6: CHECKOUT SCREEN (FITS PERFECTLY IN 100dvh VIEWPORT)
+   SCREENS 5 & 6: CHECKOUT SCREEN (ACTION BAR ABOVE GRID SO UNDO NEVER BLOCKS)
    ========================================================================== */
 .screen-checkout {
   display: flex;
@@ -967,16 +1049,15 @@ body[data-layout="mobile"] .student-btn {
 
 .co-action-bar {
   flex-shrink: 0;
-  padding-top: 2px;
 }
 
 .btn-mark-gone,
 .btn-restore-queue {
   width: 100%;
-  height: 52px;
+  height: 48px;
   border: none;
   border-radius: 10px;
-  font-size: 1.08rem;
+  font-size: 1.05rem;
   font-weight: 800;
   color: #ffffff;
   cursor: pointer;
@@ -985,7 +1066,7 @@ body[data-layout="mobile"] .student-btn {
 
 .btn-mark-gone {
   background: #dc2626;
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+  box-shadow: 0 3px 10px rgba(220, 38, 38, 0.28);
 }
 
 .btn-mark-gone:hover:not(:disabled) {
@@ -994,7 +1075,7 @@ body[data-layout="mobile"] .student-btn {
 
 .btn-restore-queue {
   background: #2563eb;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.28);
 }
 
 .btn-mark-gone:disabled,
