@@ -993,7 +993,7 @@ body[data-layout="mobile"] .student-btn {
 }
 
 /* ==========================================================================
-   SCREENS 5 & 6: CHECKOUT SCREEN (ACTION BAR ABOVE GRID SO UNDO NEVER BLOCKS)
+   SCREENS 5 & 6: CHECKOUT SCREEN
    ========================================================================== */
 .screen-checkout {
   display: flex;
@@ -1215,61 +1215,4 @@ body[data-layout="mobile"] .student-btn {
 .btn-modal-left {
   background: #dc2626;
   color: #ffffff;
-}
-
-/* ==========================================================================
-   5-SECOND UNDO TOAST BANNER
-   ========================================================================== */
-.undo-toast {
-  position: fixed;
-  bottom: max(18px, env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  width: calc(100% - 28px);
-  max-width: 480px;
-  background: #0f172a;
-  color: #ffffff;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
-  z-index: 9000;
-}
-
-.undo-toast-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-  font-weight: 600;
-  font-size: 0.94rem;
-}
-
-.btn-undo {
-  background: #facc15;
-  color: #0f172a;
-  border: none;
-  border-radius: 7px;
-  padding: 8px 16px;
-  font-weight: 900;
-  font-size: 0.9rem;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.btn-undo:hover {
-  background: #fde047;
-}
-
-.undo-progress-track {
-  height: 5px;
-  background: rgba(255, 255, 255, 0.18);
-  width: 100%;
-}
-
-.undo-progress-bar {
-  height: 100%;
-  width: 100%;
-  background: #facc15;
-  transform-origin: left center;
 }
