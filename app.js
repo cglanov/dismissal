@@ -1039,8 +1039,31 @@ function compareStudentsByMostRecent(a, b) {
 
 function getTimestampMs(isoString) {
   if (!isoString) return 0;
-  const parsed = Date.parse(isoString);
-  return isNaN(parsed) ? 0 : parsed;
+  const str = String(isoString).trim();
+
+  // Fix Safari/iOS failing on "YYYY-MM-DD HH:MM:SS" (space instead of 'T')
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(str)
+    ? str.replace(' ', 'T')
+    : str;
+
+  const parsed = Date.parse(normalized);
+  if (!isNaN(parsed)) return parsed;
+
+  // Fallback for time-only strings (e.g. "3:15:22 PM" or "15:15:22")
+  const match = str.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if (match) {
+    let hours = Number(match[1]);
+    const mins = Number(match[2]);
+    const secs = Number(match[3] || 0);
+    const meridiem = (match[4] || '').toUpperCase();
+    if (meridiem === 'PM' && hours < 12) hours += 12;
+    if (meridiem === 'AM' && hours === 12) hours = 0;
+    const d = new Date();
+    d.setHours(hours, mins, secs, 0);
+    return d.getTime();
+  }
+
+  return 0;
 }
 
 function getElapsedSeconds(isoString) {
