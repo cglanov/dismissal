@@ -883,6 +883,7 @@ function openStudentDetailModal(rowIndex) {
   document.getElementById('modal-teacher').textContent = classParts[0] || '—';
   document.getElementById('modal-ext').textContent = classParts[1] || '—';
   document.getElementById('modal-bus').textContent = st.mode ? `Bus ${st.mode}` : 'None';
+  document.getElementById('modal-location').textContent = normalizeStudentLocation(st.location) || '—';
 
   const contactsUl = document.getElementById('modal-contacts-list');
   contactsUl.innerHTML = '';
@@ -916,6 +917,18 @@ function updateModalElapsedText(st) {
 /* ==========================================================================
    SHARED UI HELPERS & CONTINUOUS 10-MINUTE COLOR GRADIENT ENGINE
    ========================================================================== */
+function normalizeStudentLocation(rawLocation) {
+  const val = String(rawLocation || '').trim().toLowerCase();
+  if (val === 'on the way') return 'On the Way';
+  if (val === 'bus') return 'Bus';
+  if (val === 'aftercare') return 'Aftercare';
+  return '';
+}
+
+function isNeededAtStatus(status) {
+  return /^needed at\b/i.test(String(status || '').trim());
+}
+
 function createStudentButtonElement(student, { extraClass = '', isReadOnly = false } = {}) {
   const btn = document.createElement(isReadOnly ? 'div' : 'button');
   if (!isReadOnly) btn.type = 'button';
@@ -946,6 +959,24 @@ function createStudentButtonElement(student, { extraClass = '', isReadOnly = fal
   rightMeta.appendChild(gradeBadge);
 
   btn.append(namesWrap, rightMeta);
+
+  // Column M ('location') visual indicators for students with a 'Needed At' status
+  if (isNeededAtStatus(student.status)) {
+    const loc = normalizeStudentLocation(student.location);
+    if (loc === 'On the Way') {
+      btn.classList.add('location-on-the-way');
+      btn.title = 'Location: On the Way';
+    } else if (loc === 'Bus' || loc === 'Aftercare') {
+      btn.classList.add('location-flash-alert');
+      btn.title = `Location: ${loc}`;
+      const flashOverlay = document.createElement('span');
+      flashOverlay.className = 'location-flash-overlay';
+      flashOverlay.setAttribute('aria-hidden', 'true');
+      flashOverlay.textContent = loc;
+      btn.appendChild(flashOverlay);
+    }
+  }
+
   return btn;
 }
 
@@ -1108,10 +1139,10 @@ function loadDemoData() {
     { rowIndex: 5, first: 'Ethan', last: 'Carter', classInfo: 'Lopez - 4105', status: 'waiting', grade: '1', time: '', mode: '', contacts: ['Elena Carter'] },
     { rowIndex: 6, first: 'Sofia', last: 'Chen', classInfo: 'White - 4302', status: 'waiting', grade: '3', time: '', mode: '', contacts: ['Wei Chen', 'Mei Lin'] },
     { rowIndex: 7, first: 'Lucas', last: 'Davis', classInfo: 'Hall - 4101', status: 'waiting', grade: 'preK', time: '', mode: '', contacts: ['Hannah Davis'] },
-    { rowIndex: 8, first: 'Ava', last: 'Miller', classInfo: 'Young - 4110', status: 'Needed at Valet', grade: '1', time: isoAgo(75), mode: '', contacts: ['Claire Miller'] },
-    { rowIndex: 9, first: 'Jaytzael', last: 'Ortiz P', classInfo: 'King - 4209', status: 'Needed at Valet', grade: '3', time: isoAgo(410), mode: '', contacts: ['Maria Ortiz', 'Carlos Ortiz'] },
-    { rowIndex: 10, first: 'Leo', last: 'Smith', classInfo: 'Scott - 4310', status: 'Needed at Valet', grade: '5', time: isoAgo(645), mode: '77', contacts: ['Rachel Smith'] },
-    { rowIndex: 11, first: 'Emma', last: 'Wang', classInfo: 'Adams - 4204', status: 'Needed at Pick Up Door', grade: '2', time: isoAgo(190), mode: '', contacts: ['Jun Wang'] }
+    { rowIndex: 8, first: 'Ava', last: 'Miller', classInfo: 'Young - 4110', status: 'Needed at Valet', grade: '1', time: isoAgo(75), mode: '', location: 'On the Way', contacts: ['Claire Miller'] },
+    { rowIndex: 9, first: 'Jaytzael', last: 'Ortiz P', classInfo: 'King - 4209', status: 'Needed at Valet', grade: '3', time: isoAgo(410), mode: '', location: 'Aftercare', contacts: ['Maria Ortiz', 'Carlos Ortiz'] },
+    { rowIndex: 10, first: 'Leo', last: 'Smith', classInfo: 'Scott - 4310', status: 'Needed at Valet', grade: '5', time: isoAgo(645), mode: '77', location: 'Bus', contacts: ['Rachel Smith'] },
+    { rowIndex: 11, first: 'Emma', last: 'Wang', classInfo: 'Adams - 4204', status: 'Needed at Pick Up Door', grade: '2', time: isoAgo(190), mode: '', location: 'On the Way', contacts: ['Jun Wang'] }
   ];
   syncBusSlotsFromState();
 }
