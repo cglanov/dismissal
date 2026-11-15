@@ -864,6 +864,7 @@ body[data-layout="mobile"] .co-grid {
 }
 
 .student-btn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -981,6 +982,56 @@ body[data-layout="mobile"] .student-btn {
 .student-btn.readonly-card .grade-badge {
   background: #94a3b8;
   color: #0f172a;
+}
+
+/* ==========================================================================
+   STUDENT LOCATION INDICATORS ('Needed At' Queues Only)
+   ========================================================================== */
+/* 'On the Way': Heavy green outline with crisp inner separator so it stands out
+   even against the 0-minute green gradient background */
+.student-btn.location-on-the-way,
+.student-btn.location-on-the-way.selected {
+  border: 4px solid #22c55e !important;
+  box-shadow: inset 0 0 0 2px #ffffff, 0 0 0 2px #15803d !important;
+}
+
+/* 'Bus' / 'Aftercare': High-contrast intermittent flashing label over the button */
+.location-flash-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.9);
+  color: #fde047;
+  border: 2px solid #facc15;
+  border-radius: 7px;
+  font-size: 0.92rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 2px 4px;
+  pointer-events: none;
+  z-index: 2;
+  animation: locationIntermittentFlash 2.2s ease-in-out infinite;
+}
+
+body[data-layout="mobile"] .location-flash-overlay {
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
+@keyframes locationIntermittentFlash {
+  0%, 42% {
+    opacity: 1;
+  }
+  52%, 90% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 .empty-state {
