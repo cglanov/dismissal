@@ -33,6 +33,14 @@ const STATE = {
   activeModalStudentRow: null,
   retryQueue: [],
   inFlightMutations: 0,
+  mutationVersion: 0,
+  lastMutationCompletedAt: 0,
+  isFetchingState: false,
+  pollIntervalId: null,
+  busSyncInFlight: false,
+  busSyncPending: null,
+  busSyncDebounceTimer: null,
+  lastRenderedBusesKey: '',
   isDemoMode: false
 };
 
@@ -173,12 +181,14 @@ function unlockApp() {
     fetchLatestState();
   }
 
-  // Start background polling loop
-  setInterval(() => {
-    if (!STATE.authenticated || STATE.isDemoMode) return;
-    flushRetryQueue();
-    fetchLatestState();
-  }, CONFIG.POLL_INTERVAL_MS);
+  // Start single background polling loop (guard against lock/unlock duplicates)
+  if (!STATE.pollIntervalId) {
+    STATE.pollIntervalId = setInterval(() => {
+      if (!STATE.authenticated || STATE.isDemoMode) return;
+      flushRetryQueue();
+      fetchLatestState();
+    }, CONFIG.POLL_INTERVAL_MS);
+  }
 }
 
 /* ==========================================================================
@@ -282,36 +292,75 @@ function navigateTo(screenId) {
 /* ==========================================================================
    BACKEND API SYNC, OPTIMISTIC UPDATES & RETRY QUEUE
    ========================================================================== */
+function hasPendingLocalChanges() {
+  return (
+    STATE.inFlightMutations > 0 ||
+    STATE.retryQueue.length > 0 ||
+    STATE.busSyncInFlight ||
+    STATE.busSyncPending !== null ||
+    STATE.busSyncDebounceTimer !== null
+  );
+}
+
 async function fetchLatestState() {
-  if (STATE.inFlightMutations > 0 || STATE.retryQueue.length > 0) {
+  if (STATE.isFetchingState || hasPendingLocalChanges()) {
     return;
   }
+
+  // Brief cooldown after a completed write so GAS cache never flashes stale state
+  if (Date.now() - STATE.lastMutationCompletedAt < 1500) {
+    return;
+  }
+
+  const requestVersion = STATE.mutationVersion;
+  STATE.isFetchingState = true;
 
   try {
     const url = `${CONFIG.API_URL}?pin=${encodeURIComponent(CONFIG.STAFF_PIN)}&action=state&t=${Date.now()}`;
     const res = await fetch(url, { method: 'GET' });
     const json = await res.json();
 
+    // Discard response if a user mutation occurred while this GET was in flight
+    if (requestVersion !== STATE.mutationVersion || hasPendingLocalChanges()) {
+      return;
+    }
+
     if (json && json.ok && json.data) {
-      applyServerState(json.data);
+      applyServerState(json.data, { preserveMruOrder: STATE.currentScreen === 'buses' });
       updateSyncBadge(true);
     } else {
       updateSyncBadge(false);
     }
   } catch (err) {
-    updateSyncBadge(false);
+    if (!hasPendingLocalChanges()) {
+      updateSyncBadge(false);
+    }
+  } finally {
+    STATE.isFetchingState = false;
   }
 }
 
-function applyServerState(data) {
+function applyServerState(data, { preserveMruOrder = false } = {}) {
   STATE.students = Array.isArray(data.students) ? data.students : [];
   STATE.activeBuses = Array.isArray(data.activeBuses) ? data.activeBuses : [];
-  STATE.mruBuses = Array.isArray(data.mruBuses) ? data.mruBuses : [];
+
+  const serverMru = Array.isArray(data.mruBuses) ? data.mruBuses : [];
+  if (preserveMruOrder && STATE.mruBuses.length > 0) {
+    // Keep existing Recent Buses in their current grid positions while on the Buses screen
+    // so checkboxes never jump out from under the user's cursor during selection
+    const serverSet = new Set(serverMru);
+    const kept = STATE.mruBuses.filter((b) => serverSet.has(b));
+    const added = serverMru.filter((b) => !kept.includes(b));
+    STATE.mruBuses = [...added, ...kept].slice(0, 30);
+  } else {
+    STATE.mruBuses = serverMru;
+  }
+
   if (data.alertThresholdSeconds) {
     STATE.alertThresholdSeconds = Number(data.alertThresholdSeconds);
   }
 
-  if (!STATE.busSlotsDirty) {
+  if (!STATE.busSlotsDirty && !STATE.busSyncInFlight && STATE.busSyncPending === null) {
     syncBusSlotsFromState();
   }
 
@@ -329,6 +378,9 @@ function updateSyncBadge(isHealthy) {
   if (STATE.retryQueue.length > 0) {
     badge.className = 'sync-badge sync-warn';
     badge.textContent = `Reconnecting — Queued (${STATE.retryQueue.length})`;
+  } else if (STATE.busSyncInFlight || STATE.busSyncPending !== null || STATE.inFlightMutations > 0) {
+    badge.className = 'sync-badge sync-live';
+    badge.textContent = 'Saving...';
   } else if (isHealthy) {
     badge.className = 'sync-badge sync-live';
     badge.textContent = 'Live • Synced';
@@ -339,12 +391,15 @@ function updateSyncBadge(isHealthy) {
 }
 
 async function sendMutation(payload) {
+  STATE.mutationVersion++;
   if (STATE.isDemoMode) {
     return;
   }
 
   const fullPayload = Object.assign({ pin: CONFIG.STAFF_PIN }, payload);
+  const sentVersion = STATE.mutationVersion;
   STATE.inFlightMutations++;
+  updateSyncBadge(true);
 
   try {
     const res = await fetch(CONFIG.API_URL, {
@@ -354,10 +409,11 @@ async function sendMutation(payload) {
     });
     const json = await res.json();
     STATE.inFlightMutations = Math.max(0, STATE.inFlightMutations - 1);
+    STATE.lastMutationCompletedAt = Date.now();
 
     if (json && json.ok && json.data) {
-      if (STATE.inFlightMutations === 0 && STATE.retryQueue.length === 0) {
-        applyServerState(json.data);
+      if (sentVersion === STATE.mutationVersion && !hasPendingLocalChanges()) {
+        applyServerState(json.data, { preserveMruOrder: STATE.currentScreen === 'buses' });
       }
       updateSyncBadge(true);
     } else {
@@ -370,7 +426,83 @@ async function sendMutation(payload) {
   }
 }
 
+/**
+ * Coalesces and serializes 'saveBuses' mutations so rapid checkbox toggles
+ * never race out-of-order or overwrite newer selections.
+ */
+function queueBusSync(cleanedActiveBuses) {
+  STATE.mutationVersion++;
+  if (STATE.isDemoMode) {
+    return;
+  }
+
+  STATE.busSyncPending = cleanedActiveBuses.slice();
+  updateSyncBadge(true);
+
+  if (STATE.busSyncDebounceTimer) {
+    clearTimeout(STATE.busSyncDebounceTimer);
+  }
+
+  STATE.busSyncDebounceTimer = setTimeout(() => {
+    STATE.busSyncDebounceTimer = null;
+    flushBusSyncQueue();
+  }, 120);
+}
+
+async function flushBusSyncQueue() {
+  if (STATE.busSyncInFlight || STATE.busSyncPending === null) {
+    return;
+  }
+
+  const busesToSave = STATE.busSyncPending;
+  STATE.busSyncPending = null;
+  STATE.busSyncInFlight = true;
+  const sentVersion = STATE.mutationVersion;
+  updateSyncBadge(true);
+
+  try {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        pin: CONFIG.STAFF_PIN,
+        action: 'saveBuses',
+        activeBuses: busesToSave
+      })
+    });
+    const json = await res.json();
+    STATE.busSyncInFlight = false;
+    STATE.lastMutationCompletedAt = Date.now();
+
+    if (json && json.ok && json.data) {
+      // If more clicks happened while saving, immediately flush the latest snapshot
+      if (STATE.busSyncPending !== null) {
+        flushBusSyncQueue();
+        return;
+      }
+
+      if (sentVersion === STATE.mutationVersion && !hasPendingLocalChanges()) {
+        applyServerState(json.data, { preserveMruOrder: STATE.currentScreen === 'buses' });
+      }
+      updateSyncBadge(true);
+    } else {
+      throw new Error((json && json.error) || 'Bus save failed');
+    }
+  } catch (err) {
+    STATE.busSyncInFlight = false;
+    // Preserve latest bus snapshot if user hasn't already queued a newer one
+    if (STATE.busSyncPending === null) {
+      STATE.busSyncPending = busesToSave;
+    }
+    updateSyncBadge(false);
+  }
+}
+
 async function flushRetryQueue() {
+  if (STATE.busSyncPending !== null && !STATE.busSyncInFlight && !STATE.busSyncDebounceTimer) {
+    flushBusSyncQueue();
+  }
+
   if (STATE.retryQueue.length === 0 || STATE.inFlightMutations > 0) return;
 
   const nextPayload = STATE.retryQueue.shift();
@@ -394,42 +526,71 @@ function bindBusEvents() {
   document.getElementById('btn-add-bus-slot').addEventListener('click', () => {
     STATE.busSlotsDirty = true;
     STATE.busInputSlots.push('');
-    renderBusesScreen();
+    renderBusesScreen(true);
   });
 
   document.getElementById('btn-clear-all-buses').addEventListener('click', () => {
     STATE.busSlotsDirty = false;
     STATE.busInputSlots = Array(CONFIG.INITIAL_BUS_SLOTS).fill('');
-    commitBusSlots();
+    commitBusSlots({ reorderMru: false });
   });
 
   document.getElementById('btn-save-buses').addEventListener('click', () => {
     STATE.busSlotsDirty = false;
-    commitBusSlots();
+    commitBusSlots({ reorderMru: true });
   });
 }
 
-function commitBusSlots() {
+function commitBusSlots({ reorderMru = false } = {}) {
   const cleaned = STATE.busInputSlots.map((s) => s.trim()).filter(Boolean);
   STATE.activeBuses = cleaned;
 
-  // Optimistically prepend & deduplicate into 30 MRU list
-  const nextMru = [];
-  cleaned.forEach((b) => {
-    if (!nextMru.includes(b)) nextMru.push(b);
-  });
-  STATE.mruBuses.forEach((b) => {
-    if (nextMru.length < 30 && !nextMru.includes(b)) nextMru.push(b);
-  });
-  STATE.mruBuses = nextMru.slice(0, 30);
+  if (reorderMru) {
+    // When explicitly saving typed buses, prepend any new or saved entries to MRU
+    const nextMru = [];
+    cleaned.forEach((b) => {
+      if (!nextMru.includes(b)) nextMru.push(b);
+    });
+    STATE.mruBuses.forEach((b) => {
+      if (nextMru.length < 30 && !nextMru.includes(b)) nextMru.push(b);
+    });
+    STATE.mruBuses = nextMru.slice(0, 30);
+  } else {
+    // Keep existing Recent Buses stable in place; only add genuinely new items if any
+    const missing = cleaned.filter((b) => !STATE.mruBuses.includes(b));
+    if (missing.length > 0) {
+      STATE.mruBuses = [...missing, ...STATE.mruBuses].slice(0, 30);
+    }
+  }
 
   syncBusSlotsFromState();
-  renderAll();
-  sendMutation({ action: 'saveBuses', activeBuses: cleaned });
+  renderAll({ forceBusesRender: true });
+  queueBusSync(cleaned);
 }
 
-function renderBusesScreen() {
+function renderBusesScreen(force = false) {
   const slotsContainer = document.getElementById('bus-slots-container');
+  const mruContainer = document.getElementById('bus-mru-list');
+
+  // Avoid disrupting active typing inside a bus slot during background polling
+  if (!force && slotsContainer.contains(document.activeElement)) {
+    return;
+  }
+
+  const renderKey = JSON.stringify({
+    layout: STATE.layoutMode,
+    slots: STATE.busInputSlots,
+    mru: STATE.mruBuses
+  });
+
+  if (!force && renderKey === STATE.lastRenderedBusesKey) {
+    return;
+  }
+  STATE.lastRenderedBusesKey = renderKey;
+
+  const prevSlotsScroll = slotsContainer.scrollTop;
+  const prevMruScroll = mruContainer.scrollTop;
+
   slotsContainer.style.setProperty('--slot-count', Math.max(1, STATE.busInputSlots.length));
   slotsContainer.innerHTML = '';
 
@@ -456,7 +617,7 @@ function renderBusesScreen() {
       if (e.key === 'Enter') {
         e.preventDefault();
         STATE.busSlotsDirty = false;
-        commitBusSlots();
+        commitBusSlots({ reorderMru: true });
       }
     });
 
@@ -469,7 +630,7 @@ function renderBusesScreen() {
       STATE.busInputSlots.splice(idx, 1);
       STATE.busInputSlots.push('');
       STATE.busSlotsDirty = false;
-      commitBusSlots();
+      commitBusSlots({ reorderMru: false });
     });
 
     row.append(num, input, clearBtn);
@@ -477,13 +638,13 @@ function renderBusesScreen() {
   });
 
   // Render Recent Buses/Transportation Checklist (Column B)
-  const mruContainer = document.getElementById('bus-mru-list');
   const mruRowCount = Math.max(1, Math.ceil(STATE.mruBuses.length / 2));
   mruContainer.style.setProperty('--mru-rows', mruRowCount);
   mruContainer.innerHTML = '';
 
   if (STATE.mruBuses.length === 0) {
     mruContainer.innerHTML = '<div class="empty-state">No recent buses yet. Type a bus above and save to build your recent list.</div>';
+    slotsContainer.scrollTop = prevSlotsScroll;
     return;
   }
 
@@ -514,7 +675,7 @@ function renderBusesScreen() {
         }
       }
       STATE.busSlotsDirty = false;
-      commitBusSlots();
+      commitBusSlots({ reorderMru: false });
     });
 
     const textSpan = document.createElement('span');
@@ -524,6 +685,9 @@ function renderBusesScreen() {
     label.append(checkbox, textSpan);
     mruContainer.appendChild(label);
   });
+
+  slotsContainer.scrollTop = prevSlotsScroll;
+  mruContainer.scrollTop = prevMruScroll;
 }
 
 /* ==========================================================================
@@ -1036,7 +1200,7 @@ function tickLiveTimers() {
   }
 }
 
-function renderAll() {
+function renderAll({ forceBusesRender = false } = {}) {
   // Update Start Screen Live Badges
   const valetCount = STATE.students.filter((s) => s.status === 'Needed at Valet').length;
   const pickupCount = STATE.students.filter((s) => s.status === 'Needed at Pick Up Door').length;
@@ -1048,7 +1212,7 @@ function renderAll() {
   document.getElementById('badge-pickup-co-count').textContent = `${pickupCount} ready`;
 
   if (STATE.currentScreen === 'buses') {
-    renderBusesScreen();
+    renderBusesScreen(forceBusesRender);
   } else if (STATE.currentScreen === 'valet-entry' || STATE.currentScreen === 'pickup-entry') {
     renderNameEntryScreen();
   } else if (STATE.currentScreen === 'valet-checkout' || STATE.currentScreen === 'pickup-checkout') {
