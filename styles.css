@@ -855,6 +855,23 @@ body[data-layout="mobile"] .ne-active-zone {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+/* Group Headers inside Name Entry Student Pool */
+.ne-group-header {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  padding: 4px 2px 3px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--navy);
+  border-bottom: 1.5px solid #cbd5e1;
+}
+
+.ne-group-header:first-child {
+  margin-top: 0;
+}
+
 /* Checkout Grid: 4 columns on Desktop horizontal, 3 columns on Mobile vertical */
 body[data-layout="desktop"] .co-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -941,7 +958,22 @@ body[data-layout="mobile"] .student-btn {
   letter-spacing: -0.01em;
 }
 
-/* Selected State on Waiting Pool */
+/* Subtle visual distinction for non-waiting groups in Name Entry before selection */
+.student-btn.ne-other-needed {
+  background-color: #52637a;
+  border-color: #94a3b8;
+}
+
+.student-btn.ne-left-building {
+  background-color: #64748b;
+  opacity: 0.92;
+}
+
+.student-btn.ne-left-building.selected {
+  opacity: 1;
+}
+
+/* Selected State on Name Entry Pool */
 .student-btn.selected {
   background-color: var(--btn-selected) !important;
   border-color: #93c5fd;
