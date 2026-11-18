@@ -269,11 +269,13 @@ function navigateTo(screenId) {
   } else if (screenId === 'valet-entry') {
     backBtn.classList.remove('hidden');
     titleEl.textContent = 'Valet - Name Entry';
+    document.getElementById('ne-waiting-title').textContent = 'Students';
     document.getElementById('ne-active-title').textContent = 'Needed at Valet';
     document.getElementById('screen-name-entry').classList.remove('hidden');
   } else if (screenId === 'pickup-entry') {
     backBtn.classList.remove('hidden');
     titleEl.textContent = 'Pickup Door - Name Entry';
+    document.getElementById('ne-waiting-title').textContent = 'Students';
     document.getElementById('ne-active-title').textContent = 'Needed at Pick Up Door';
     document.getElementById('screen-name-entry').classList.remove('hidden');
   } else if (screenId === 'valet-checkout') {
@@ -741,38 +743,77 @@ function bindNameEntryEvents() {
 }
 
 function renderNameEntryScreen() {
-  const targetStatus = STATE.currentScreen === 'valet-entry'
-    ? 'Needed at Valet'
-    : 'Needed at Pick Up Door';
+  const isValet = STATE.currentScreen === 'valet-entry';
+  const targetStatus = isValet ? 'Needed at Valet' : 'Needed at Pick Up Door';
+  const otherNeededStatus = isValet ? 'Needed at Pick Up Door' : 'Needed at Valet';
 
-  // Zone A: Waiting Students ('waiting'), sorted A->Z by last then first
+  // Prune any selected IDs that are no longer in Zone A (e.g., already moved to targetStatus)
+  const eligibleIds = new Set(
+    STATE.students
+      .filter(
+        (st) =>
+          st.status === 'waiting' ||
+          st.status === otherNeededStatus ||
+          st.status === 'Left the Building'
+      )
+      .map((st) => st.rowIndex)
+  );
+  STATE.selectedWaitingIds.forEach((id) => {
+    if (!eligibleIds.has(id)) {
+      STATE.selectedWaitingIds.delete(id);
+    }
+  });
+
   const query = STATE.searchQueryWaiting.trim().toLowerCase();
+  const matchesQuery = (st) => {
+    if (!query) return true;
+    return (
+      st.first.toLowerCase().includes(query) ||
+      st.last.toLowerCase().includes(query)
+    );
+  };
+
+  // Group 1 (Top, no header): 'waiting'
   const waitingStudents = STATE.students
-    .filter((st) => st.status === 'waiting')
-    .filter((st) => {
-      if (!query) return true;
-      return (
-        st.first.toLowerCase().includes(query) ||
-        st.last.toLowerCase().includes(query)
-      );
-    })
+    .filter((st) => st.status === 'waiting' && matchesQuery(st))
     .sort(compareStudentsByLastThenFirst);
 
-  document.getElementById('ne-waiting-count').textContent = waitingStudents.length;
+  // Group 2 (Middle, header = otherNeededStatus)
+  const otherNeededStudents = STATE.students
+    .filter((st) => st.status === otherNeededStatus && matchesQuery(st))
+    .sort(compareStudentsByLastThenFirst);
+
+  // Group 3 (Bottom, header = 'Left the Building')
+  const leftStudents = STATE.students
+    .filter((st) => st.status === 'Left the Building' && matchesQuery(st))
+    .sort(compareStudentsByLastThenFirst);
+
+  const totalShown =
+    waitingStudents.length + otherNeededStudents.length + leftStudents.length;
+
+  document.getElementById('ne-waiting-count').textContent = totalShown;
   document.getElementById('ne-selected-count').textContent = STATE.selectedWaitingIds.size;
   document.getElementById('ne-submit-btn').disabled = STATE.selectedWaitingIds.size === 0;
 
   const waitingGrid = document.getElementById('ne-waiting-grid');
   waitingGrid.innerHTML = '';
 
-  if (waitingStudents.length === 0) {
-    waitingGrid.innerHTML = '<div class="empty-state">No waiting students match your search.</div>';
-  } else {
-    waitingStudents.forEach((st) => {
+  const appendStudentGroup = (students, { headingText = '', extraBaseClass = '' } = {}) => {
+    if (students.length === 0) return;
+
+    if (headingText) {
+      const headerEl = document.createElement('div');
+      headerEl.className = 'ne-group-header';
+      headerEl.textContent = headingText;
+      waitingGrid.appendChild(headerEl);
+    }
+
+    students.forEach((st) => {
       const isSelected = STATE.selectedWaitingIds.has(st.rowIndex);
-      const btn = createStudentButtonElement(st, {
-        extraClass: isSelected ? 'selected' : ''
-      });
+      const classes = [extraBaseClass, isSelected ? 'selected' : '']
+        .filter(Boolean)
+        .join(' ');
+      const btn = createStudentButtonElement(st, { extraClass: classes });
 
       btn.addEventListener('click', () => {
         if (STATE.selectedWaitingIds.has(st.rowIndex)) {
@@ -784,6 +825,20 @@ function renderNameEntryScreen() {
       });
 
       waitingGrid.appendChild(btn);
+    });
+  };
+
+  if (totalShown === 0) {
+    waitingGrid.innerHTML = '<div class="empty-state">No students match your search.</div>';
+  } else {
+    appendStudentGroup(waitingStudents);
+    appendStudentGroup(otherNeededStudents, {
+      headingText: otherNeededStatus,
+      extraBaseClass: 'ne-other-needed'
+    });
+    appendStudentGroup(leftStudents, {
+      headingText: 'Left the Building',
+      extraBaseClass: 'ne-left-building'
     });
   }
 
@@ -1306,7 +1361,8 @@ function loadDemoData() {
     { rowIndex: 8, first: 'Ava', last: 'Miller', classInfo: 'Young - 4110', status: 'Needed at Valet', grade: '1', time: isoAgo(75), mode: '', location: 'On the Way', contacts: ['Claire Miller'] },
     { rowIndex: 9, first: 'Jaytzael', last: 'Ortiz P', classInfo: 'King - 4209', status: 'Needed at Valet', grade: '3', time: isoAgo(410), mode: '', location: 'Aftercare', contacts: ['Maria Ortiz', 'Carlos Ortiz'] },
     { rowIndex: 10, first: 'Leo', last: 'Smith', classInfo: 'Scott - 4310', status: 'Needed at Valet', grade: '5', time: isoAgo(645), mode: '77', location: 'Bus', contacts: ['Rachel Smith'] },
-    { rowIndex: 11, first: 'Emma', last: 'Wang', classInfo: 'Adams - 4204', status: 'Needed at Pick Up Door', grade: '2', time: isoAgo(190), mode: '', location: 'On the Way', contacts: ['Jun Wang'] }
+    { rowIndex: 11, first: 'Emma', last: 'Wang', classInfo: 'Adams - 4204', status: 'Needed at Pick Up Door', grade: '2', time: isoAgo(190), mode: '', location: 'On the Way', contacts: ['Jun Wang'] },
+    { rowIndex: 12, first: 'Maya', last: 'Patel', classInfo: 'Brown - 4206', status: 'Left the Building', grade: '3', time: isoAgo(120), mode: '', contacts: ['Priya Patel'] }
   ];
   syncBusSlotsFromState();
 }
