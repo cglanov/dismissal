@@ -289,8 +289,43 @@
           <span id="modal-location" class="detail-value">—</span>
         </div>
         <div class="detail-contacts">
-          <span class="detail-label">Authorized Pickup Contacts</span>
+          <div class="detail-contacts-header">
+            <span class="detail-label">Authorized Pickup Contacts</span>
+            <button type="button" id="modal-btn-add-contact" class="btn-add-contact">
+              + Add Contact
+            </button>
+          </div>
           <ul id="modal-contacts-list" class="contacts-list"></ul>
+
+          <form id="add-contact-form" class="add-contact-form hidden" novalidate>
+            <div class="add-contact-fields">
+              <input
+                type="text"
+                id="add-contact-first"
+                placeholder="First Name"
+                autocomplete="off"
+                autocapitalize="words"
+                spellcheck="false"
+              />
+              <input
+                type="text"
+                id="add-contact-last"
+                placeholder="Last Name"
+                autocomplete="off"
+                autocapitalize="words"
+                spellcheck="false"
+              />
+            </div>
+            <div id="add-contact-error" class="add-contact-error hidden" role="alert"></div>
+            <div class="add-contact-actions">
+              <button type="button" id="add-contact-cancel" class="btn-add-contact-cancel">
+                Cancel
+              </button>
+              <button type="submit" id="add-contact-submit" class="btn-add-contact-submit">
+                Submit
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 
