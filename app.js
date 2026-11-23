@@ -366,6 +366,13 @@ function applyServerState(data, { preserveMruOrder = false } = {}) {
     syncBusSlotsFromState();
   }
 
+  if (STATE.activeModalStudentRow !== null) {
+    const openStudent = STATE.students.find((s) => s.rowIndex === STATE.activeModalStudentRow);
+    if (openStudent) {
+      renderModalContactsList(openStudent);
+    }
+  }
+
   renderAll();
 }
 
@@ -1055,6 +1062,62 @@ function bindModalEvents() {
     if (e.target.id === 'student-modal') closeStudentDetailModal();
   });
 
+  // Toggle Add Contact inline form
+  const addContactBtn = document.getElementById('modal-btn-add-contact');
+  const addContactForm = document.getElementById('add-contact-form');
+  const firstInput = document.getElementById('add-contact-first');
+  const lastInput = document.getElementById('add-contact-last');
+  const cancelContactBtn = document.getElementById('add-contact-cancel');
+  const errorEl = document.getElementById('add-contact-error');
+
+  addContactBtn.addEventListener('click', () => {
+    errorEl.classList.add('hidden');
+    errorEl.textContent = '';
+    addContactForm.classList.remove('hidden');
+    addContactBtn.classList.add('hidden');
+    firstInput.focus();
+  });
+
+  cancelContactBtn.addEventListener('click', () => {
+    resetAddContactForm();
+  });
+
+  addContactForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const st = STATE.students.find((s) => s.rowIndex === STATE.activeModalStudentRow);
+    if (!st) return;
+
+    const firstName = firstInput.value.trim();
+    const lastName = lastInput.value.trim();
+
+    if (!firstName || !lastName) {
+      errorEl.textContent = 'Please enter both a first and last name.';
+      errorEl.classList.remove('hidden');
+      if (!firstName) {
+        firstInput.focus();
+      } else {
+        lastInput.focus();
+      }
+      return;
+    }
+
+    const fullName = `${firstName} ${lastName}`;
+    if (!Array.isArray(st.contacts)) {
+      st.contacts = [];
+    }
+    st.contacts.push(fullName);
+
+    renderModalContactsList(st);
+    resetAddContactForm();
+
+    sendMutation({
+      action: 'addContact',
+      rowIndex: st.rowIndex,
+      firstName,
+      lastName
+    });
+  });
+
   // Action 2: Remove from List -> reverts status to 'waiting', clears Column F timestamp
   document.getElementById('modal-btn-remove').addEventListener('click', () => {
     const st = STATE.students.find((s) => s.rowIndex === STATE.activeModalStudentRow);
@@ -1088,22 +1151,22 @@ function bindModalEvents() {
   });
 }
 
-function openStudentDetailModal(rowIndex) {
-  const st = STATE.students.find((s) => s.rowIndex === rowIndex);
-  if (!st) return;
+function resetAddContactForm() {
+  const addContactBtn = document.getElementById('modal-btn-add-contact');
+  const addContactForm = document.getElementById('add-contact-form');
+  const firstInput = document.getElementById('add-contact-first');
+  const lastInput = document.getElementById('add-contact-last');
+  const errorEl = document.getElementById('add-contact-error');
 
-  STATE.activeModalStudentRow = rowIndex;
+  firstInput.value = '';
+  lastInput.value = '';
+  errorEl.textContent = '';
+  errorEl.classList.add('hidden');
+  addContactForm.classList.add('hidden');
+  addContactBtn.classList.remove('hidden');
+}
 
-  document.getElementById('modal-student-name').textContent = `${st.first} ${st.last}`;
-  document.getElementById('modal-student-grade').textContent = `Grade ${st.grade || '—'}`;
-
-  // Parse Column C ('<Teacher> - <Ext>')
-  const classParts = st.classInfo.split(' - ');
-  document.getElementById('modal-teacher').textContent = classParts[0] || '—';
-  document.getElementById('modal-ext').textContent = classParts[1] || '—';
-  document.getElementById('modal-bus').textContent = st.mode ? `Bus ${st.mode}` : 'None';
-  document.getElementById('modal-location').textContent = normalizeStudentLocation(st.location) || '—';
-
+function renderModalContactsList(st) {
   const contactsUl = document.getElementById('modal-contacts-list');
   contactsUl.innerHTML = '';
   if (st.contacts && st.contacts.length > 0) {
@@ -1118,6 +1181,26 @@ function openStudentDetailModal(rowIndex) {
     li.style.color = '#64748b';
     contactsUl.appendChild(li);
   }
+}
+
+function openStudentDetailModal(rowIndex) {
+  const st = STATE.students.find((s) => s.rowIndex === rowIndex);
+  if (!st) return;
+
+  STATE.activeModalStudentRow = rowIndex;
+  resetAddContactForm();
+
+  document.getElementById('modal-student-name').textContent = `${st.first} ${st.last}`;
+  document.getElementById('modal-student-grade').textContent = `Grade ${st.grade || '—'}`;
+
+  // Parse Column C ('<Teacher> - <Ext>')
+  const classParts = st.classInfo.split(' - ');
+  document.getElementById('modal-teacher').textContent = classParts[0] || '—';
+  document.getElementById('modal-ext').textContent = classParts[1] || '—';
+  document.getElementById('modal-bus').textContent = st.mode ? `Bus ${st.mode}` : 'None';
+  document.getElementById('modal-location').textContent = normalizeStudentLocation(st.location) || '—';
+
+  renderModalContactsList(st);
 
   updateModalElapsedText(st);
   document.getElementById('student-modal').classList.remove('hidden');
@@ -1125,6 +1208,7 @@ function openStudentDetailModal(rowIndex) {
 
 function closeStudentDetailModal() {
   STATE.activeModalStudentRow = null;
+  resetAddContactForm();
   document.getElementById('student-modal').classList.add('hidden');
 }
 
