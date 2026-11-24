@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindNameEntryEvents();
   bindCheckoutEvents();
   bindModalEvents();
+  bindShareModalEvents();
 
   if (checkSavedAuthSession()) {
     unlockApp();
@@ -101,6 +102,7 @@ function lockStation() {
   STATE.pinBuffer = '';
   updatePinDots();
   document.getElementById('pin-error').textContent = '';
+  document.getElementById('share-modal').classList.add('hidden');
   document.getElementById('app-shell').classList.add('hidden');
   document.getElementById('pin-screen').classList.remove('hidden');
 }
@@ -1215,6 +1217,33 @@ function closeStudentDetailModal() {
 function updateModalElapsedText(st) {
   const secs = getElapsedSeconds(st.time);
   document.getElementById('modal-elapsed').textContent = `Elapsed Wait: ${formatMMSS(secs)}`;
+}
+
+/* ==========================================================================
+   SHARE APP QR CODE MODAL
+   ========================================================================== */
+function bindShareModalEvents() {
+  const shareBtn = document.getElementById('btn-share-app');
+  const shareModal = document.getElementById('share-modal');
+  const closeBtn = document.getElementById('share-modal-close');
+
+  const closeShareModal = () => shareModal.classList.add('hidden');
+
+  shareBtn.addEventListener('click', () => {
+    shareModal.classList.remove('hidden');
+  });
+
+  closeBtn.addEventListener('click', closeShareModal);
+
+  shareModal.addEventListener('click', (e) => {
+    if (e.target === shareModal) closeShareModal();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !shareModal.classList.contains('hidden')) {
+      closeShareModal();
+    }
+  });
 }
 
 /* ==========================================================================
