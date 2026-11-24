@@ -73,6 +73,9 @@
 
       <div class="header-right">
         <span id="sync-badge" class="sync-badge sync-live">Live • Synced</span>
+        <button type="button" id="btn-share-app" class="btn-header" title="Share App">
+          Share App
+        </button>
         <button type="button" id="btn-layout-toggle" class="btn-header btn-toggle" title="Switch Desktop / Mobile Layout">
           Desktop | Mobile
         </button>
@@ -339,6 +342,23 @@
         <button type="button" id="modal-btn-left" class="btn-modal btn-modal-left">
           Left the Building
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       SHARE APP QR CODE MODAL
+       ===================================================================== -->
+  <div id="share-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="share-modal-title">
+    <div class="modal-card share-modal-card">
+      <div class="modal-header share-modal-header">
+        <h3 id="share-modal-title">Share App</h3>
+        <button type="button" id="share-modal-close" class="btn-modal-x" aria-label="Close Share App modal">
+          &times;
+        </button>
+      </div>
+      <div class="share-modal-body">
+        <img src="qr.png" alt="QR code to share the DISMISSAL app" class="qr-code-img" />
       </div>
     </div>
   </div>
